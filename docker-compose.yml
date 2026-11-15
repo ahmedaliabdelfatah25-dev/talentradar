@@ -1,0 +1,71 @@
+# Self-hosted deployment on a single Linux VM: application + PostgreSQL + automatic HTTPS (Caddy).
+# Usage:  cp .env.example .env  →  edit .env  →  docker compose up -d --build
+# For Azure-managed hosting use deploy/azure/main.bicep instead (see docs/IT_HANDOVER.md).
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://talentradar:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/talentradar
+      PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8080"
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: talentradar
+      POSTGRES_USER: talentradar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talentradar -d talentradar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Terminates TLS and obtains/renews the certificate for APP_DOMAIN automatically.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  # Nightly logical backup into ./backups (see deploy/backup.sh for retention).
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: talentradar
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: talentradar
+      BACKUP_DIR: /backups
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./backups:/backups
+      - ./deploy/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c", "while true; do sh /usr/local/bin/backup.sh; sleep 86400; done"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,13 @@
+# HTTPS reverse proxy. Caddy requests and renews a public certificate for {$APP_DOMAIN} automatically,
+# which requires the DNS record to point at this server and ports 80/443 to be reachable.
+# For an internal-only hostname, replace the site block's first line with:
+#   {$APP_DOMAIN} {
+#       tls /certs/fullchain.pem /certs/privkey.pem
+# and mount the company certificate into the caddy service.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:8080
+	header {
+		-Server
+	}
+}
