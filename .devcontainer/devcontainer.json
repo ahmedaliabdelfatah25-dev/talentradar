@@ -1,0 +1,14 @@
+{
+  // Opens Talent Radar with fictional demonstration data in GitHub Codespaces.
+  // The app and its PostgreSQL database are started from the repository's own Dockerfile.
+  "name": "Talent Radar demo (fictional data)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": { "label": "Talent Radar", "protocol": "http", "onAutoForward": "openBrowser" }
+  },
+  "postStartCommand": "bash .devcontainer/start-demo.sh"
+}

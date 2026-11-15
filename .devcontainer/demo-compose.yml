@@ -1,0 +1,35 @@
+# Demo stack for GitHub Codespaces: the production image built from ../Dockerfile plus PostgreSQL.
+# Fictional demonstration data only. For real hosting use ../docker-compose.yml or deploy/azure.
+services:
+  app:
+    build: ..
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DEMO_DATA: "true"
+      APP_URL: ${APP_URL:-}
+      TRUST_PROXY: "1"
+      LOGIN_RATE_LIMIT: "300"
+      DATABASE_URL: postgres://talentradar:${POSTGRES_PASSWORD:?missing}@db:5432/talentradar
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: talentradar
+      POSTGRES_USER: talentradar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?missing}
+    volumes:
+      - demo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talentradar -d talentradar"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+volumes:
+  demo_pgdata:
